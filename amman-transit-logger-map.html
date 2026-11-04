@@ -716,6 +716,12 @@ svg.leaflet-image-layer.leaflet-interactive path {
   <div class="g2"><div><label>LTRC fare (JOD)</label><input id="fare" type="number" step="0.05" min="0" value="0.35"></div>
   <div><label>Fare type</label><select id="ftype"><option value="flat">Flat</option><option value="staged">Staged</option></select></div></div>
   <label><input type="checkbox" id="sim" style="width:auto"> Demo GPS simulator (test without moving)</label>
+  <div id="simopt" hidden>
+   <label>Demo start (place name or lat,lng)</label><input id="s1" value="31.9487,35.9403">
+   <label>Demo end (place name or lat,lng)</label><input id="s2" value="31.9780,35.9050">
+   <div class="g3"><div><label>Speed (km/h)</label><input id="sspd" type="number" min="1" value="30"></div><div><label>Update every (s)</label><input id="sfrq" type="number" min="0.5" step="0.5" value="1"></div><div><label>GPS noise (m)</label><input id="sjit" type="number" min="0" value="3"></div></div>
+   <small class="mut">The demo drives along real roads between the two points. Place names need internet.</small>
+  </div>
   <div class="g2" style="margin-top:10px"><button id="rev">Reverse route</button><button class="p" id="start">I boarded</button></div>
  </div>
  <div id="live" hidden>
@@ -775,11 +781,33 @@ function twice(b,fn){const o=b.textContent;let a=0;b.onclick=()=>{if(a){a=0;b.te
 /* ---------- GPS ---------- */
 const SIM=[[31.9487,35.9403],[31.9530,35.9340],[31.9580,35.9270],[31.9640,35.9190],[31.9700,35.9110],[31.9780,35.9050]];
 function startGPS(){
- if(S.sim){const d=[];for(let i=0;i<SIM.length-1;i++){const a={lat:SIM[i][0],lng:SIM[i][1]},b={lat:SIM[i+1][0],lng:SIM[i+1][1]},n=Math.max(1,Math.round(hav(a,b)/30));for(let k=0;k<n;k++)d.push({lat:a.lat+(b.lat-a.lat)*k/n,lng:a.lng+(b.lng-a.lng)*k/n})}
-  let i=0;simT=setInterval(()=>{const q=d[Math.min(i++,d.length-1)];onFix({lat:q.lat+(Math.random()-.5)*4e-5,lng:q.lng+(Math.random()-.5)*4e-5,acc:8,t:Date.now()})},1000);return}
+ if(S.sim){startSim();return}
  if(!navigator.geolocation){$('#gps').textContent='No GPS here';return}
  wid=navigator.geolocation.watchPosition(p=>onFix({lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy,spd:p.coords.speed,alt:p.coords.altitude,t:p.timestamp}),e=>{$('#gps').textContent='GPS blocked';toast('GPS error: '+e.message+'. Open the link in your browser, or use the demo simulator.')},{enableHighAccuracy:true,maximumAge:0,timeout:20000});
  try{navigator.wakeLock&&navigator.wakeLock.request('screen').then(w=>wl=w).catch(()=>{})}catch(e){}
+}
+async function geo(txt){
+ const m=txt.match(/^\s*(-?\d+(?:\.\d+)?)\s*[,; ]\s*(-?\d+(?:\.\d+)?)\s*$/);
+ if(m)return{lat:+m[1],lng:+m[2]};
+ const j=await(await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=jo&q='+encodeURIComponent(txt))).json();
+ if(!j.length)throw new Error('Place not found: '+txt);
+ return{lat:+j[0].lat,lng:+j[0].lon}
+}
+async function startSim(){
+ const c=S.simcfg,s0=S;$('#gps').textContent='Demo: routing…';let path;
+ try{const a=await geo(c.a),b=await geo(c.b);
+  const j=await(await fetch(`${OSRM}/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}?overview=full&geometries=geojson`)).json();
+  path=j.code==='Ok'?j.routes[0].geometry.coordinates.map(q=>({lat:q[1],lng:q[0]})):[a,b]}
+ catch(e){toast((e&&e.message)||'Demo routing failed');return}
+ if(S!==s0)return;
+ const seg=[0];for(let i=1;i<path.length;i++)seg.push(seg[i-1]+hav(path[i-1],path[i]));
+ const total=seg[seg.length-1];let dist=0;
+ const pos=m=>{let i=1;while(i<seg.length-1&&seg[i]<m)i++;const f=(m-seg[i-1])/Math.max(seg[i]-seg[i-1],1e-6);return{lat:path[i-1].lat+(path[i].lat-path[i-1].lat)*f,lng:path[i-1].lng+(path[i].lng-path[i-1].lng)*f}};
+ simT=setInterval(()=>{
+  dist=Math.min(total,dist+c.v/3.6*c.f);const q=pos(dist),jm=c.j/111320;
+  onFix({lat:q.lat+(Math.random()-.5)*2*jm,lng:q.lng+(Math.random()-.5)*2*jm,acc:Math.max(5,c.j*2),spd:c.v/3.6,t:Date.now()});
+  if(dist>=total){clearInterval(simT);toast('Demo reached the destination')}
+ },Math.max(200,c.f*1000))
 }
 function stopGPS(){clearInterval(simT);try{if(wid!=null)navigator.geolocation.clearWatch(wid)}catch(e){}wid=null;try{wl&&wl.release()}catch(e){}wl=null;last=null;kmh=0;$('#gps').textContent='GPS idle'}
 function onFix(p){
@@ -792,11 +820,12 @@ function onFix(p){
 const persist=()=>{DB.active=S;save()};
 
 /* ---------- Ride session ---------- */
+$('#sim').onchange=()=>$('#simopt').hidden=!$('#sim').checked;
 $('#rev').onclick=()=>{const a=$('#from').value;$('#from').value=$('#to').value;$('#to').value=a;$('#dir').value=$('#dir').value==='outbound'?'inbound':'outbound'};
 $('#start').onclick=()=>{
  const g=i=>$(i).value.trim(),code=g('#code'),from=g('#from'),to=g('#to');
  if(!code||!from||!to)return toast('Enter route code, origin and destination');
- S={code,name:g('#name')||from+' - '+to,from,to,veh:$('#veh').value,dir:$('#dir').value,fare:+$('#fare').value||0,ftype:$('#ftype').value,sim:$('#sim').checked,board:Date.now(),dep:null,tam:0,pts:[],pins:[],dist:0};
+ S={code,name:g('#name')||from+' - '+to,from,to,veh:$('#veh').value,dir:$('#dir').value,fare:+$('#fare').value||0,ftype:$('#ftype').value,sim:$('#sim').checked,simcfg:{a:g('#s1'),b:g('#s2'),v:Math.max(1,+$('#sspd').value||30),f:Math.max(.2,+$('#sfrq').value||1),j:Math.max(0,+$('#sjit').value||0)},board:Date.now(),dep:null,tam:0,pts:[],pins:[],dist:0};
  persist();enterLive()
 };
 function enterLive(){fitted=false;follow=true;tailGeo=null;dotSnap=null;$('#setup').hidden=true;$('#live').hidden=false;startGPS();ui();draw()}
