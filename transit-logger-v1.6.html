@@ -206,7 +206,7 @@ $('#setup-img-del').onclick=()=>{setupImgData='';$('#setup-img').value='';('#set
 function show(v){('section').forEach(s=>s.hidden=s.id!=='v-'+v);('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v=v));if(v='data')renderData();if(v==='route')draw()}
 $$('nav button').forEach(b=>b.onclick=()=>show(b.dataset.v));
 function twice(b,fn){const o=b.textContent;let a=0;b.onclick=()=>{if(a){a=0;b.textContent=o;fn();return}a=1;b.textContent='Tap again';setTimeout(()=>{a=0;b.textContent=o},3000)}}
-​/* ---------- Live Notification & Background Keep-Alive ---------- /
+​/* ---------- Live Notification & Background Keep-Alive ---------- */
 let swReg=null,bgAudio=null,lastNotifT=0;
 if('serviceWorker' in navigator){
 navigator.serviceWorker.register('./sw.js').then(r=>swReg=r).catch(()=>{});
@@ -365,7 +365,7 @@ showSysNotif(title,body,art,!S.dep,false);
 }
 }
 updateNotifChip();
-​/* ---------- GPS ---------- /
+​/* ---------- GPS ---------- */
 const SIM=[[31.9487,35.9403],[31.9530,35.9340],[31.9580,35.9270],[31.9640,35.9190],[31.9700,35.9110],[31.9780,35.9050]];
 function startGPS(){
 startKeepAlive();
@@ -470,7 +470,7 @@ updateNotif(false);
 if(DB.ao&&!$('#olive').hidden)('#oel').textContent=fmt((Date.now()-DB.ao.start)/1000)
 }
 setInterval(ui,1000);
-​/* ---------- Leaflet map (OpenStreetMap tiles) ---------- /
+​/* ---------- Leaflet map (OpenStreetMap tiles) ---------- */
 let M=null,trace,pinL,me,acc,follow=true,fitted=false;
 function initMap(){
 if(M)return;
@@ -531,7 +531,7 @@ $('#ostop').onclick=()=>{if(!DB.ao||!DB.ao.taps.length)return toast('Tap at leas
 function head(taps){const m={};taps.forEach(t=>(m[t.line]=m[t.line]||[]).push(t.t));return Object.entries(m).map(([line,a])=>{a.sort((p,q)=>p-q);return{line,n:a.length,gap:a.length>1?(a[a.length-1]-a[0])/(a.length-1)/60000:null}})}
 const headTxt=taps=>head(taps).map(h=>`<div class="row"><span>${esc(h.line)}</span><span>${h.n} vehicles${h.gap?' · every '+h.gap.toFixed(1)+' min':''}</span></div>`).join('');
 function obsUI(){const a=DB.ao;$('#oset').hidden=!!a;$('#olive').hidden=!a;if(a){('#otitle').textContent=a.loc;$('#osum').innerHTML=headTxt(a.taps)||'<span class="mut">No vehicles logged yet.</span>'}}
-​/* ---------- Export ---------- /
+​/* ---------- Export ---------- */
 function rdp(a,e){if(a.length<3)return a;const k=Math.cos(a[0].latrad),m=111320,X=p=>p.lngkm,Y=p=>p.latm,A=a[0],B=a[a.length-1],dx=X(B)-X(A),dy=Y(B)-Y(A),L=Math.hypot(dx,dy)||1;let mx=0,ix=0;for(let i=1;i<a.length-1;i++){const d=Math.abs(dy(X(a[i])-X(A))-dx*(Y(a[i])-Y(A)))/L;if(d>mx){mx=d;ix=i}}return mx>e?[...rdp(a.slice(0,ix+1),e).slice(0,-1),...rdp(a.slice(ix),e)]:[A,B]}
 const q=s=>s?'${String(s).replace(/'/g,"''")}':'NULL::text';
 function toSQL(r){
