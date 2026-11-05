@@ -1,0 +1,82 @@
+<!-- ... existing code ... -->
+<body>
+<header>
+<h1>Amman Transit Logger <small class="mut">v1.8</small></h1>
+<div class="chips">
+<!-- ... existing code ... -->
+<details class="card" id="cfg"><summary><b>Settings</b> (recording, notification, noise filter, snapping)</summary><div id="cfgbox"></div><small class="mut">A point is saved only when you moved at least the larger of "min metres" and GPS error x factor, and at least "min seconds" passed. Stopped or in a jam = no points.</small>
+<div class="g2" style="margin-top:10px">
+<button id="cfgexport">Export settings</button>
+<button id="cfgimportbtn">Import settings</button>
+</div>
+<input type="file" id="cfgimportfile" accept=".json,application/json" hidden>
+<button id="cfgreset" style="width:100%;margin-top:8px">Reset to defaults</button></details>
+</section>
+<!-- ... existing code ... -->
+let S = DB.active, last = null, kmh = 0, wid = null, simT = null, wl = null, setupImgData = '';
+const PT = { passenger_stop: ['Passenger stop', '#e6a100'], major_hub: ['Major hub', '#7c3aed'], terminal_stand: ['Terminal bay', '#2f6f5e'], jam_start: ['Jam Start', '#c8372d'], jam_end: ['Jam End', '#16a34a'], route_note: ['Route note', '#64748b'] };
+const VPRE = { servis: 'SRV', coaster: 'COT', bus: 'BUS', brt: 'BRT' };
+<!-- ... existing code ... -->
+/* ---------- Boot ---------- */
+const CFGD = { dt: 3, dd: 10, ak: 1, hb: 30, acc: 40, snap: 1, si: 8, di: 3, rkm: 8, ntf: 1 };
+const CF = [['rkm', 'Expected route distance for notification progress bar (km)', 0.5], ['dt', 'Min seconds between points', 0.5], ['dd', 'Min metres moved between points', 1], ['ak', 'Also require movement > GPS error x', 0.1], ['hb', 'Heartbeat point when stopped (s, 0 = never)', 1], ['acc', 'Ignore fixes worse than (m)', 5], ['si', 'Road-snap the trace every (s)', 1], ['di', 'Road-snap the dot every (s)', 1]];
+
+function CFG() {
+    const o = {};
+    for (const k in CFGD) {
+        const e = $('#c_' + k);
+        o[k] = !e ? CFGD[k] : e.type === 'checkbox' ? (e.checked ? 1 : 0) : (parseFloat(e.value) >= 0 ? parseFloat(e.value) : CFGD[k])
+    }
+    return o
+}
+
+function renderCfg() {
+    const c = Object.assign({}, CFGD, DB.cfg || {});
+    $('#cfgbox').innerHTML = CF.map(([k, l, st]) => `<label>${l}</label><input id="c_${k}" type="number" min="0" step="${st}" value="${c[k]}">`).join('') + `<label><input type="checkbox" id="c_snap" style="width:auto"${c.snap ? ' checked' : ''}> Snap to roads (needs internet)</label><label><input type="checkbox" id="c_ntf" style="width:auto"${c.ntf ? ' checked' : ''}> Live notification panel &amp; keep GPS awake when screen locks</label>`
+}
+
+$('#cfg').addEventListener('change', () => { DB.cfg = CFG(); save() });
+$('#cfgreset').onclick = () => { DB.cfg = null; save(); renderCfg(); toast('Settings reset') };
+
+$('#cfgexport').onclick = () => {
+    const curCfg = CFG();
+    const blob = new Blob([JSON.stringify(curCfg, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'atl-settings.json';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove() }, 500);
+    toast('Settings exported');
+};
+
+$('#cfgimportbtn').onclick = () => $('#cfgimportfile').click();
+
+$('#cfgimportfile').onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const r = new FileReader();
+    r.onload = ev => {
+        try {
+            const parsed = JSON.parse(ev.target.result);
+            if (typeof parsed === 'object' && parsed !== null) {
+                DB.cfg = Object.assign({}, CFGD, parsed);
+                save();
+                renderCfg();
+                toast('Settings imported successfully');
+            } else throw new Error('Invalid JSON');
+        } catch (err) {
+            toast('Failed to import settings: Invalid JSON');
+        }
+        $('#cfgimportfile').value = '';
+    };
+    r.readAsText(file);
+};
+
+renderCfg();
+syncSetupAuto();
+if (S) { $('#sim').checked = !!S.sim; enterLive() }
+obsUI();
+</script>
+</body>
+</html>
