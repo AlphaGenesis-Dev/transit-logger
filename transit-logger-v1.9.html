@@ -1,22 +1,724 @@
-<!-- ... existing code ... -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Amman Transit Logger v1.9</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{--bg:#e9e6df;--card:#f7f5f0;--ink:#1b1f23;--mut:#666b70;--line:#cfcbc0;--acc:#f2b705;--accInk:#1b1f23;--rec:#2f6f5e;--bad:#c8372d;--pause:#d97706;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15181b;--card:#1f2428;--ink:#ece9e1;--mut:#9aa0a5;--line:#343b41;--rec:#5fc4a5;--bad:#ff7b6f;--pause:#fbbf24;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#15181b;--card:#1f2428;--ink:#ece9e1;--mut:#9aa0a5;--line:#343b41;--rec:#5fc4a5;--bad:#ff7b6f;--pause:#fbbf24;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-variant-numeric:tabular-nums}
+[hidden]{display:none!important}
+header{display:flex;justify-content:space-between;align-items:center;padding:12px 14px 8px;gap:6px}
+h1{font-size:18px;margin:0;letter-spacing:-.01em}
+.chips{display:flex;gap:6px;align-items:center}
+.chip{font-size:12px;padding:3px 8px;border-radius:4px;background:var(--card);border:1px solid var(--line);color:var(--mut)}
+.chip.on{border-color:var(--rec);color:var(--rec);font-weight:600}
+nav{display:flex;margin:0 14px 12px;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+nav button{flex:1;border:0;border-radius:0;background:var(--card);min-height:44px}
+nav button.on{background:var(--ink);color:var(--bg);font-weight:600}
+section>div,section>p,section>details{margin:0 14px 12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px}
+label{display:block;font-size:12px;color:var(--mut);margin:9px 0 3px}
+input,select,textarea{width:100%;padding:10px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit}
+button{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px;min-height:50px;cursor:pointer}
+button:active{transform:scale(.98)}
+button.p{background:var(--acc);color:var(--accInk);border-color:var(--acc);font-weight:700;width:100%}
+button.d{border-color:var(--bad);color:var(--bad)}
+:focus-visible{outline:3px solid var(--acc);outline-offset:1px}
+.g2,.g3,.g2c{display:grid;gap:8px}.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr 1fr 1fr}.g2c{grid-template-columns:1fr 110px}
+.uc{text-transform:uppercase;font-family:ui-monospace,monospace;font-weight:600}
+#map{width:100%;height:300px;border-radius:6px;border:1px solid var(--line);z-index:0}
+.leaflet-container{font:inherit}
+.st{display:grid;grid-template-columns:repeat(4,1fr);text-align:center;margin:10px 0}
+.st b{display:block;font-size:18px}.st span,small,.mut{font-size:12px;color:var(--mut)}
+.bar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 12px;border-radius:8px;background:var(--acc);color:var(--accInk);font-weight:700}
+.bar.rec{background:var(--rec);color:#fff}
+.bar.paused{background:var(--pause);color:#fff}
+.bar button,.bar select{min-height:38px;background:var(--ink);color:var(--bg);border:0;font-weight:700;padding:0 10px;border-radius:6px}
+.bar.rec button{background:#fff;color:var(--rec)}
+.bar.paused button{background:#fff;color:var(--pause)}
+textarea{height:110px;font:12px ui-monospace,monospace}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:9px 14px;border-radius:8px;z-index:9;max-width:90%}
+.row{display:flex;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px solid var(--line)}
+.img-thumb{width:100%;max-height:120px;object-fit:cover;border-radius:6px;border:1px solid var(--line);margin-top:6px}
+</style>
+</head>
 <body>
 <header>
-<h1>Amman Transit Logger <small class="mut">v1.8</small></h1>
+<h1>Amman Transit Logger <small class="mut">v1.9</small></h1>
 <div class="chips">
-<!-- ... existing code ... -->
-<details class="card" id="cfg"><summary><b>Settings</b> (recording, notification, noise filter, snapping)</summary><div id="cfgbox"></div><small class="mut">A point is saved only when you moved at least the larger of "min metres" and GPS error x factor, and at least "min seconds" passed. Stopped or in a jam = no points.</small>
-<div class="g2" style="margin-top:10px">
-<button id="cfgexport">Export settings</button>
-<button id="cfgimportbtn">Import settings</button>
+<span class="chip" id="nbtn" role="button" tabindex="0" title="Enable or test notification">🔔 Notify</span>
+<span class="chip" id="gps">GPS idle</span>
 </div>
-<input type="file" id="cfgimportfile" accept=".json,application/json" hidden>
-<button id="cfgreset" style="width:100%;margin-top:8px">Reset to defaults</button></details>
+</header>
+<nav><button data-v="route" class="on">Ride</button><button data-v="obs">Observer</button><button data-v="data">Data</button></nav>
+<section id="v-route">
+<div class="card" id="setup">
+<div class="g2c">
+<div><label>Origin terminal / area</label><input id="from" value="Raghadan Terminal"></div>
+<div><label>Origin code</label><input id="fcode" class="uc" value="RAGHT" maxlength="8" placeholder="RAGHT"></div>
+</div>
+<div class="g2c">
+<div><label>Destination terminal / area</label><input id="to" value="Adan Neighborhood"></div>
+<div><label>Dest. code</label><input id="tcode" class="uc" value="ADANN" maxlength="8" placeholder="ADANN"></div>
+</div>
+<div class="g2c">
+<div>
+<label>Vehicle</label>
+<select id="veh">
+<option value="servis">Servis (SRV)</option>
+<option value="coaster">Coaster (COT)</option>
+<option value="bus">Large Bus · Amman / Autobus (BUS)</option>
+<option value="brt">BRT (BRT)</option>
+</select>
+</div>
+<div><label>Number</label><input id="vnum" class="uc" value="001" maxlength="6" placeholder="001"></div>
+</div>
+<div class="g3">
+<div><label>Direction</label><select id="dir"><option value="outbound">Outbound</option><option value="inbound">Inbound</option></select></div>
+<div><label>Fare (JOD)</label><input id="fare" type="number" step="0.05" min="0" value="0.35"></div>
+<div><label>Fare type</label><select id="ftype"><option value="flat">Flat</option><option value="staged">Staged</option></select></div>
+</div>
+<hr style="border:0;border-top:1px solid var(--line);margin:12px 0 4px">
+<label>Route name (auto-filled, editable)</label><input id="name" value="Raghadan Terminal - Adan Neighborhood">
+<label>Route code (auto-filled, editable)</label><input id="code" class="uc" value="RAGHT-ADANN (SRV001)">
+<label>Trip photo / Sticker / Receipt (optional)</label>
+<input type="file" id="setup-img" accept="image/*">
+<div id="setup-img-prev-wrap" hidden style="margin-top:6px">
+<img id="setup-img-prev" class="img-thumb" alt="Preview">
+<button type="button" id="setup-img-del" style="min-height:36px;margin-top:4px;width:100%">Remove photo</button>
+</div>
+<label><input type="checkbox" id="sim" style="width:auto"> Demo GPS simulator (test without moving)</label>
+<div id="simopt" hidden>
+<label>Demo start (place name or lat,lng)</label><input id="s1" value="31.9487,35.9403">
+<label>Demo end (place name or lat,lng)</label><input id="s2" value="31.9780,35.9050">
+<div class="g3"><div><label>Speed (km/h)</label><input id="sspd" type="number" min="1" value="30"></div><div><label>Update every (s)</label><input id="sfrq" type="number" min="0.5" step="0.5" value="1"></div><div><label>GPS noise (m)</label><input id="sjit" type="number" min="0" value="3"></div></div>
+<small class="mut">The demo drives along real roads between the two points. Place names need internet.</small>
+</div>
+<div class="g2" style="margin-top:10px"><button id="rev">Reverse route</button><button class="p" id="start">I boarded</button></div>
+<small class="mut">No time now? Start anyway. Fill or fix every detail later: Trip details during the ride, or Edit details in the Data tab.</small>
+</div>
+<div id="live" hidden>
+<div class="bar" id="phase">
+<span id="ptxt"></span>
+<div style="display:flex;gap:6px">
+<button id="pause-btn">Pause</button>
+<button id="depart">Vehicle departed</button>
+</div>
+</div>
+<div class="card" style="margin-top:12px">
+<div id="map" aria-label="Live map"></div><button id="rc" style="width:100%;min-height:38px;margin-top:8px">Recenter on me</button>
+<div class="st"><div><b id="sd">0.00</b><span>km</span></div><div><b id="sv">0</b><span>km/h</span></div><div><b id="sp">0</b><span>points</span></div><div><b id="sn">0</b><span>pins</span></div></div>
+<input id="lbl" placeholder="Pin label (optional)">
+<div class="g2" style="margin-top:6px"><input id="call" placeholder="Kuntorol callout"><input id="stk" placeholder="Sticker colour"></div>
+</div>
+<div class="g2" id="pins"></div>
+<details class="card" id="ed" style="margin-top:12px"><summary><b>Trip details</b> (edit anytime, or later in Data)</summary><div id="edbox"></div></details>
+<div class="g3" style="margin-top:12px"><button id="undo">Undo pin</button><button class="d" id="discard">Discard</button><button class="p" id="finish">Save ride</button></div>
+</div>
+<details class="card" id="cfg">
+<summary><b>Settings</b> (recording, notification, noise filter, snapping)</summary>
+<div id="cfgbox"></div>
+<small class="mut">A point is saved only when you moved at least the larger of "min metres" and GPS error x factor, and at least "min seconds" passed. Stopped or in a jam = no points.</small>
+<button id="cfgreset" style="width:100%;margin-top:8px">Reset to defaults</button>
+<div class="g2" style="margin-top:8px">
+    <button id="cfgexp">Export settings</button>
+    <button id="cfgimp_btn">Import settings</button>
+</div>
+<input type="file" id="cfgimp_file" accept="application/json" hidden>
+</details>
 </section>
-<!-- ... existing code ... -->
+<section id="v-obs" hidden>
+<div class="card" id="oset"><label>Observation spot</label><input id="oloc" placeholder="Dakhliyeh Circle"><p class="mut">Stand at a bottleneck and tap each passing vehicle with its load. Headways are computed per line.</p><button class="p" id="ostart">Start observing</button></div>
+<div class="card" id="olive" hidden>
+<b id="otitle"></b> <small id="oel"></small>
+<label>Line (route code or destination)</label><input id="oline" placeholder="Zarqa Coaster">
+<div class="g2" id="loads" style="margin-top:8px"></div>
+<div id="osum" style="margin-top:10px"></div>
+<div class="g2" style="margin-top:10px"><button id="oundo">Undo tap</button><button class="p" id="ostop">Save session</button></div>
+</div>
+</section>
+<section id="v-data" hidden>
+<div id="routes"></div>
+<div id="obsd"></div>
+<div class="g2"><button id="bkdl" class="p">Download backup</button><button id="backup">Copy JSON</button></div>
+<div><button id="seqreset" style="width:100%">Reset numbering to 0000</button></div>
+<div><textarea id="out" hidden readonly></textarea></div>
+</section>
+<div id="toast" hidden></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const R = 6371000, rad = Math.PI / 180;
+const hav = (a, b) => { const u = (b.lat - a.lat) * rad, v = (b.lng - a.lng) * rad, x = Math.sin(u / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(v / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(x)) };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0) + ';');
+const fmt = s => { s = Math.max(0, Math.round(s)); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0') };
+
+let DB = { routes: [], obs: [], active: null, ao: null };
+try { const x = JSON.parse(localStorage.getItem('atl') || 'null'); if (x) DB = Object.assign(DB, x) } catch (e) {}
+const save = () => { try { localStorage.setItem('atl', JSON.stringify(DB)) } catch (e) {} };
 let S = DB.active, last = null, kmh = 0, wid = null, simT = null, wl = null, setupImgData = '';
 const PT = { passenger_stop: ['Passenger stop', '#e6a100'], major_hub: ['Major hub', '#7c3aed'], terminal_stand: ['Terminal bay', '#2f6f5e'], jam_start: ['Jam Start', '#c8372d'], jam_end: ['Jam End', '#16a34a'], route_note: ['Route note', '#64748b'] };
 const VPRE = { servis: 'SRV', coaster: 'COT', bus: 'BUS', brt: 'BRT' };
-<!-- ... existing code ... -->
+const VLIST = [['servis', 'Servis (SRV)'], ['coaster', 'Coaster (COT)'], ['bus', 'Large Bus · Amman / Autobus (BUS)'], ['brt', 'BRT (BRT)']];
+
+function fmtVnum(v) {
+    const s = String(v ?? '').trim().toUpperCase();
+    if (!s) return '001';
+    return /^\d+/.test(s) ? s.padStart(3, '0') : s;
+}
+
+function buildRouteCode(fc, tc, veh, vnum) {
+    const a = (fc || '').trim().toUpperCase() || 'XXXXX';
+    const b = (tc || '').trim().toUpperCase() || 'XXXXX';
+    const p = VPRE[veh] || 'SRV';
+    const n = fmtVnum(vnum);
+    return `${a}-${b} (${p}${n})`;
+}
+
+function buildRouteName(fr, to) {
+    const a = (fr || '').trim(), b = (to || '').trim();
+    return a && b ? `${a} - ${b}` : (a || b || 'Unnamed route');
+}
+
+function syncSetupAuto() {
+    $('#code').value = buildRouteCode($('#fcode').value, $('#tcode').value, $('#veh').value, $('#vnum').value);
+    $('#name').value = buildRouteName($('#from').value, $('#to').value);
+}
+
+['#from', '#fcode', '#to', '#tcode', '#veh', '#vnum'].forEach(sel => {
+    $(sel).addEventListener('input', syncSetupAuto);
+    $(sel).addEventListener('change', syncSetupAuto);
+});
+$('#vnum').addEventListener('blur', () => { $('#vnum').value = fmtVnum($('#vnum').value); syncSetupAuto() });
+
+// Image handler for setup
+function handleImgFile(file, cb) {
+    if (!file) { cb(''); return }
+    const r = new FileReader();
+    r.onload = e => {
+        // compress image slightly via canvas
+        const img = new Image();
+        img.onload = () => {
+            const c = document.createElement('canvas'); let w = img.width, h = img.height;
+            const m = 800; if (w > m || h > m) { if (w > h) { h = Math.round(h * m / w); w = m } else { w = Math.round(w * m / h); h = m } }
+            c.width = w; c.height = h; c.getContext('2d').drawImage(img, 0, 0, w, h);
+            cb(c.toDataURL('image/jpeg', 0.75));
+        };
+        img.src = e.target.result;
+    };
+    r.readAsDataURL(file);
+}
+
+$('#setup-img').onchange = e => handleImgFile(e.target.files[0], d => {
+    setupImgData = d;
+    const prev = $('#setup-img-prev'), wrap = $('#setup-img-prev-wrap');
+    if (d) { prev.src = d; wrap.hidden = false } else { prev.src = ''; wrap.hidden = true }
+});
+$('#setup-img-del').onclick = () => { setupImgData = ''; $('#setup-img').value = ''; $('#setup-img-prev-wrap').hidden = true };
+
+function toast(m) { const t = $('#toast'); t.textContent = m; t.hidden = false; clearTimeout(toast.i); toast.i = setTimeout(() => t.hidden = true, 2200) }
+function show(v) { $$('section').forEach(s => s.hidden = s.id !== 'v-' + v); $$('nav button').forEach(b => b.classList.toggle('on', b.dataset.v === v)); if (v === 'data') renderData(); if (v === 'route') draw() }
+$$('nav button').forEach(b => b.onclick = () => show(b.dataset.v));
+function twice(b, fn) { const o = b.textContent; let a = 0; b.onclick = () => { if (a) { a = 0; b.textContent = o; fn(); return } a = 1; b.textContent = 'Tap again'; setTimeout(() => { a = 0; b.textContent = o }, 3000) } }
+
+/* ---------- Live Notification & Background Keep-Alive ---------- */
+let swReg = null, bgAudio = null, lastNotifT = 0;
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').then(r => swReg = r).catch(() => {});
+    navigator.serviceWorker.addEventListener('message', e => onSwMsg(e.data));
+}
+if (typeof BroadcastChannel !== 'undefined') {
+    try { new BroadcastChannel('atl_sw').onmessage = e => onSwMsg(e.data) } catch (e) {}
+}
+
+function onSwMsg(d) {
+    if (!d || d.type !== 'ATL_ACTION' || !S) return;
+    if (d.action === 'depart' && !S.dep) $('#depart').click();
+    else if (d.action === 'pin_stop') pin('passenger_stop');
+    else if (d.action === 'pin_hub') pin('major_hub');
+    else if (d.action === 'pin_jam') pin('jam_start');
+    else if (d.action === 'pin_note') pin('route_note');
+    else if (d.action === 'finish') { if (S.dep && S.pts.length >= 2) endRide(true); else toast('Need departure + 2 points before saving') }
+    else if (d.action === 'discard') endRide(false);
+    updateNotif(true);
+}
+
+function makeSilentWav() {
+    const sr = 8000, n = sr, b = new ArrayBuffer(44 + n * 2), v = new DataView(b), w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)) };
+    w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
+    return URL.createObjectURL(new Blob([b], { type: 'audio/wav' }));
+}
+
+function startKeepAlive() {
+    if (!CFG().ntf) return;
+    try {
+        if (!bgAudio) { bgAudio = new Audio(makeSilentWav()); bgAudio.loop = true; bgAudio.volume = 0.01 }
+        bgAudio.play().catch(() => {});
+        if ('mediaSession' in navigator) {
+            navigator.mediaSession.setActionHandler('play', () => { bgAudio && bgAudio.play(); if (S && !S.dep) $('#depart').click(); else if (S) pin('passenger_stop') });
+            navigator.mediaSession.setActionHandler('pause', () => { bgAudio && bgAudio.play(); if (S && !S.dep) $('#depart').click(); else if (S) pin('passenger_stop') });
+            navigator.mediaSession.setActionHandler('nexttrack', () => { if (S && !S.dep) $('#depart').click(); else if (S) pin('passenger_stop') });
+            navigator.mediaSession.setActionHandler('previoustrack', () => { if (S) pin('major_hub') });
+            navigator.mediaSession.setActionHandler('stop', () => { if (S && S.dep && S.pts.length >= 2) endRide(true) });
+        }
+    } catch (e) {}
+}
+
+function stopKeepAlive() {
+    try { if (bgAudio) { bgAudio.pause(); bgAudio.currentTime = 0 } } catch (e) {}
+    try { if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none' } catch (e) {}
+    closeNotif();
+}
+
+function drawNotifArt(pct, title, sub, eta) {
+    try {
+        const c = document.createElement('canvas'); c.width = 512; c.height = 256;
+        const x = c.getContext('2d');
+        const g = x.createLinearGradient(0, 0, 512, 256); g.addColorStop(0, '#1c1b29'); g.addColorStop(1, '#2d2342');
+        x.fillStyle = g; x.fillRect(0, 0, 512, 256);
+        x.fillStyle = '#ece9e1'; x.fillRect(36, 52, 44, 52); x.fillStyle = '#1c1b29'; x.fillRect(42, 60, 32, 20);
+        x.fillStyle = '#ece9e1'; x.beginPath(); x.arc(46, 96, 5, 0, 7); x.arc(70, 96, 5, 0, 7); x.fill();
+        x.fillStyle = '#ffffff'; x.font = 'bold 30px system-ui,sans-serif'; x.fillText(title.slice(0, 24), 100, 72);
+        x.fillStyle = '#d0cde1'; x.font = '22px system-ui,sans-serif'; x.fillText(sub.slice(0, 34), 100, 106);
+        x.fillStyle = '#9aa0a5'; x.font = '20px system-ui,sans-serif'; x.fillText(eta.slice(0, 36), 100, 136);
+        const bx = 40, by = 192, bw = 400, bh = 12, px = bx + Math.max(0, Math.min(1, pct)) * bw;
+        x.fillStyle = '#555266'; x.beginPath(); x.roundRect(bx, by, bw, bh, 6); x.fill();
+        x.fillStyle = '#8fd14f'; x.beginPath(); x.roundRect(px, by, Math.max(0, bw - (px - bx)), bh, 6); x.fill();
+        x.fillStyle = '#1d6fe0'; x.beginPath(); x.arc(px, by + 6, 18, 0, 7); x.fill();
+        x.lineWidth = 4; x.strokeStyle = '#fff'; x.stroke();
+        x.fillStyle = '#ece9e1'; x.fillRect(456, 178, 24, 28);
+        return c.toDataURL('image/png');
+    } catch (e) { return '' }
+}
+
+function textBar(pct) {
+    const n = 12, k = Math.max(0, Math.min(n, Math.round(pct * n)));
+    return '━'.repeat(k) + '🔵' + '━'.repeat(n - k) + ' 🚌 ' + Math.round(pct * 100) + '%';
+}
+
+function updateNotifChip() {
+    const b = $('#nbtn'); if (!b) return;
+    const ok = 'Notification' in window && Notification.permission === 'granted';
+    b.textContent = ok ? '🔔 Notify ON' : '🔔 Notify';
+    b.classList.toggle('on', ok);
+}
+
+async function askNotifPerm(testToast) {
+    if (!('Notification' in window)) { if (testToast) toast('Notifications not supported in this browser'); return false }
+    let p = Notification.permission;
+    if (p === 'default') { try { p = await Notification.requestPermission() } catch (e) {} }
+    updateNotifChip();
+    if (p !== 'granted') { if (testToast) toast('Please allow notifications in browser site settings'); return false }
+    return true;
+}
+
+$('#nbtn').onclick = async () => {
+    const ok = await askNotifPerm(true);
+    if (ok) {
+        startKeepAlive();
+        if (S) updateNotif(true);
+        else {
+            const dest = $('#to').value || 'Adan Neighborhood';
+            const art = drawNotifArt(0.35, 'Ride to ' + dest, '3 stops · 13 min · 2.8 km', `Arrive 16:58 · ${$('#code').value}`);
+            showSysNotif('Ride to ' + dest, `3 stops · 13 min · 2.8 km\nArrive 16:58 · ${textBar(0.35)}`, art, false, true);
+            toast('Test notification sent to panel');
+        }
+    }
+};
+
+async function showSysNotif(title, body, art, isTamseek, isPreview) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    const actions = isPreview ? [] : isTamseek ? [
+        { action: 'depart', title: 'Vehicle departed' },
+        { action: 'pin_note', title: '+ Note' },
+        { action: 'discard', title: 'Discard' }
+    ] : [
+        { action: 'pin_stop', title: '+ Stop pin' },
+        { action: 'pin_hub', title: '+ Hub pin' },
+        { action: 'finish', title: 'End trip' }
+    ];
+    const opts = { body, tag: 'atl-live', renotify: false, silent: true, requireInteraction: !isPreview, icon: art || undefined, badge: art || undefined, actions };
+    try {
+        if (swReg && swReg.showNotification) { await swReg.showNotification(title, opts); return }
+        new Notification(title, opts);
+    } catch (e) {}
+}
+
+function closeNotif() {
+    try { if (swReg && swReg.getNotifications) swReg.getNotifications({ tag: 'atl-live' }).then(list => list.forEach(n => n.close())) } catch (e) {}
+}
+
+function updateNotif(force) {
+    if (!S || !CFG().ntf) return;
+    const now = Date.now(), c = CFG(), estM = Math.max(500, (c.rkm || 8) * 1000);
+    const pct = S.dep ? Math.min(1, S.dist / estM) : 0;
+    const stops = S.pins.filter(p => p.type === 'passenger_stop' || p.type === 'major_hub').length;
+    const dest = S.to && S.to !== '?' ? S.to : S.code;
+    const title = S.dep ? (S.paused ? `⏸️ PAUSED · Ride to ${dest}` : `Ride to ${dest}`) : `Tamseek · ${S.from !== '?' ? S.from : S.code}`;
+    let sub = '', eta = '';
+    
+    if (!S.dep) {
+        sub = `Waiting to depart · ${fmt((now - S.board) / 1000)}`;
+        eta = `${S.code} · Tap "Vehicle departed"`;
+    } else if (S.paused) {
+        sub = `PAUSED (Dinner / Stop) · ${(S.dist / 1000).toFixed(2)} km`;
+        eta = `Tap Resume to continue recording · ${S.code}`;
+    } else {
+        const elS = (now - S.dep) / 1000, elMin = Math.max(1, Math.round(elS / 60));
+        const spdKmh = kmh > 3 ? kmh : (elS > 30 ? (S.dist / 1000) / (elS / 3600) : 22);
+        const remKm = Math.max(0, (estM - S.dist) / 1000), remMin = Math.round((remKm / Math.max(5, spdKmh)) * 60);
+        const arr = new Date(now + remMin * 60000);
+        const arrStr = String(arr.getHours()).padStart(2, '0') + ':' + String(arr.getMinutes()).padStart(2, '0');
+        sub = `${stops} stops · ${elMin} min · ${(S.dist / 1000).toFixed(2)} km · ${Math.round(kmh)} km/h`;
+        eta = `Arrive ~${arrStr} (${remMin} min left) · ${S.code}`;
+    }
+    
+    if ('mediaSession' in navigator) {
+        try {
+            navigator.mediaSession.playbackState = S.paused ? 'paused' : 'playing';
+            const art = (force || now - lastNotifT > 4500) ? drawNotifArt(pct, title, sub, eta) : undefined;
+            navigator.mediaSession.metadata = new MediaMetadata({
+                title,
+                artist: sub,
+                album: eta,
+                artwork: art ? [{ src: art, sizes: '512x512', type: 'image/png' }] : []
+            });
+        } catch (e) {}
+    }
+    if (force || now - lastNotifT >= 5000) {
+        lastNotifT = now;
+        const art = drawNotifArt(pct, title, sub, eta);
+        const body = S.dep ? `${sub}\n${eta}\n${textBar(pct)}` : `${sub}\n${eta}`;
+        showSysNotif(title, body, art, !S.dep, false);
+    }
+}
+updateNotifChip();
+
+/* ---------- GPS ---------- */
+const SIM = [[31.9487, 35.9403], [31.9530, 35.9340], [31.9580, 35.9270], [31.9640, 35.9190], [31.9700, 35.9110], [31.9780, 35.9050]];
+function startGPS() {
+    startKeepAlive();
+    if (S.sim) { startSim(); return }
+    if (!navigator.geolocation) { $('#gps').textContent = 'No GPS here'; return }
+    wid = navigator.geolocation.watchPosition(p => onFix({ lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy, spd: p.coords.speed, alt: p.coords.altitude, t: p.timestamp }), e => { $('#gps').textContent = 'GPS blocked'; toast('GPS error: ' + e.message + '. Open the link in your browser, or use the demo simulator.') }, { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
+    try { navigator.wakeLock && navigator.wakeLock.request('screen').then(w => wl = w).catch(() => {}) } catch (e) {}
+}
+
+async function geo(txt) {
+    const m = txt.match(/^\s*(-?\d+(?:\.\d+)?)\s*[,; ]\s*(-?\d+(?:\.\d+)?)\s*$/);
+    if (m) return { lat: +m[1], lng: +m[2] };
+    const j = await (await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=jo&q=' + encodeURIComponent(txt))).json();
+    if (!j.length) throw new Error('Place not found: ' + txt);
+    return { lat: +j[0].lat, lng: +j[0].lon }
+}
+
+async function startSim() {
+    const c = S.simcfg, s0 = S; $('#gps').textContent = 'Demo: routing…'; let path;
+    const OSRM = 'https://router.project-osrm.org';
+    try {
+        const a = await geo(c.a), b = await geo(c.b);
+        const j = await (await fetch(`${OSRM}/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}?overview=full&geometries=geojson`)).json();
+        path = j.code === 'Ok' ? j.routes[0].geometry.coordinates.map(q => ({ lat: q[1], lng: q[0] })) : [a, b]
+    }
+    catch (e) { toast((e && e.message) || 'Demo routing failed'); return }
+    
+    if (S !== s0) return;
+    const seg = [0]; for (let i = 1; i < path.length; i++) seg.push(seg[i - 1] + hav(path[i - 1], path[i]));
+    const total = seg[seg.length - 1]; let dist = 0;
+    const pos = m => { let i = 1; while (i < seg.length - 1 && seg[i] < m) i++; const f = (m - seg[i - 1]) / Math.max(seg[i] - seg[i - 1], 1e-6); return { lat: path[i - 1].lat + (path[i].lat - path[i - 1].lat) * f, lng: path[i - 1].lng + (path[i].lng - path[i - 1].lng) * f } };
+    
+    simT = setInterval(() => {
+        dist = Math.min(total, dist + c.v / 3.6 * c.f); const q = pos(dist), jm = c.j / 111320;
+        onFix({ lat: q.lat + (Math.random() - .5) * 2 * jm, lng: q.lng + (Math.random() - .5) * 2 * jm, acc: Math.max(5, c.j * 2), spd: c.v / 3.6, t: Date.now() });
+        if (dist >= total) { clearInterval(simT); toast('Demo reached the destination') }
+    }, Math.max(200, c.f * 1000))
+}
+
+function stopGPS() { clearInterval(simT); try { if (wid != null) navigator.geolocation.clearWatch(wid) } catch (e) {} wid = null; try { wl && wl.release() } catch (e) {} wl = null; last = null; kmh = 0; $('#gps').textContent = 'GPS idle'; stopKeepAlive() }
+
+function onFix(p) {
+    if (last) { const dt = (p.t - last.t) / 1000, d = hav(last, p); const v = p.spd != null ? p.spd * 3.6 : (dt > 0 && d > Math.max(p.acc, last.acc) ? d / dt * 3.6 : 0); kmh = Math.min(150, kmh * 0.5 + v * 0.5) }
+    last = p; $('#gps').textContent = 'GPS ±' + Math.round(p.acc) + ' m';
+    const c = CFG();
+    if (S && S.dep && !S.paused && p.acc <= c.acc) {
+        const q = S.pts[S.pts.length - 1], d = q ? hav(q, p) : 0, dt = q ? (p.t - q.t) / 1000 : 1e9, need = Math.max(c.dd, p.acc * c.ak);
+        if (!q || (d >= need && dt >= c.dt) || (c.hb > 0 && dt >= c.hb)) {
+            if (q && d >= need) S.dist += d;
+            S.pts.push({ lat: +p.lat.toFixed(6), lng: +p.lng.toFixed(6), t: p.t, acc: Math.round(p.acc), alt: p.alt ?? null, v: Math.round(kmh), cum: Math.round(S.dist * 10) / 10 });
+            persist(); updateNotif(false)
+        }
+    }
+    draw(); ui(); snapDot(); snapLive();
+}
+const persist = () => { DB.active = S; save() };
+
+/* ---------- Ride session ---------- */
+$('#sim').onchange = () => $('#simopt').hidden = !$('#sim').checked;
+$('#rev').onclick = () => {
+    const a = $('#from').value; $('#from').value = $('#to').value; $('#to').value = a;
+    const ac = $('#fcode').value; $('#fcode').value = $('#tcode').value; $('#tcode').value = ac;
+    $('#dir').value = $('#dir').value === 'outbound' ? 'inbound' : 'outbound';
+    syncSetupAuto();
+};
+
+$('#start').onclick = async () => {
+    const g = i => $(i).value.trim();
+    const from = g('#from'), to = g('#to'), fcode = g('#fcode').toUpperCase(), tcode = g('#tcode').toUpperCase(), veh = $('#veh').value, vnum = fmtVnum(g('#vnum'));
+    const code = g('#code') || buildRouteCode(fcode, tcode, veh, vnum);
+    const name = g('#name') || buildRouteName(from, to);
+    S = { code: code || 'UNSET', name: name || 'Unnamed route', from: from || '?', fcode: fcode || 'XXXXX', to: to || '?', tcode: tcode || 'XXXXX', veh, vnum, dir: $('#dir').value, fare: +$('#fare').value || 0, ftype: $('#ftype').value, sim: $('#sim').checked, simcfg: { a: g('#s1'), b: g('#s2'), v: Math.max(1, +$('#sspd').value || 30), f: Math.max(.2, +$('#sfrq').value || 1), j: Math.max(0, +$('#sjit').value || 0) }, board: Date.now(), dep: null, tam: 0, paused: false, img: setupImgData || '', pts: [], pins: [], dist: 0 };
+    persist();
+    setupImgData = ''; $('#setup-img').value = ''; $('#setup-img-prev-wrap').hidden = true;
+    if (CFG().ntf) await askNotifPerm(false);
+    enterLive();
+    updateNotif(true);
+};
+
+function enterLive() { fitted = false; follow = true; tailGeo = null; dotSnap = null; $('#setup').hidden = true; $('#live').hidden = false; startGPS(); ui(); draw() }
+
+$('#pins').innerHTML = Object.entries(PT).map(([k, v]) => `<button data-p="${k}" style="border-left:6px solid ${v[1]}">${v[0]}</button>`).join('');
+$('#pins').onclick = e => { const b = e.target.closest('button'); if (b) pin(b.dataset.p) };
+
+function pin(type) {
+    const pos = last || (S && S.pts.length ? S.pts[S.pts.length - 1] : null);
+    if (!pos) return toast('No GPS fix yet');
+    const c = n => { const v = $(n).value.trim(); $(n).value = ''; return v }, n = S.pins.filter(p => p.type === type).length + 1;
+    S.pins.push({ type, label: c('#lbl') || PT[type][0] + ' ' + n, callout: c('#call'), sticker: c('#stk'), lat: +pos.lat.toFixed(6), lng: +pos.lng.toFixed(6), t: Date.now(), cum: Math.round(S.dist) });
+    persist(); draw(); ui(); updateNotif(true); toast(PT[type][0] + ' pinned'); try { navigator.vibrate(40) } catch (e) {}
+}
+
+$('#undo').onclick = () => { if (S && S.pins.length) { S.pins.pop(); persist(); draw(); ui(); updateNotif(true); toast('Last pin removed') } };
+$('#depart').onclick = () => {
+    S.dep = Date.now(); S.tam = Math.round((S.dep - S.board) / 1000);
+    if (last) S.pins.push({ type: 'terminal_stand', label: S.from + ' bay', callout: '', sticker: '', lat: +last.lat.toFixed(6), lng: +last.lng.toFixed(6), t: S.dep, cum: 0 });
+    persist(); ui(); updateNotif(true); toast('Recording route');
+};
+
+$('#pause-btn').onclick = () => {
+    S.paused = !S.paused;
+    const pb = $('#pause-btn'); pb.textContent = S.paused ? 'Resume' : 'Pause';
+    $('#phase').className = 'bar' + (S.paused ? ' paused' : (S.dep ? ' rec' : ''));
+    persist(); updateNotif(true);
+    toast(S.paused ? 'Recording paused (dinner/stop)' : 'Recording resumed');
+};
+
+async function endRide(saveIt) {
+    if (ending) return; ending = true; stopGPS();
+    if (saveIt) { toast('Snapping route to roads…'); S.trip = Math.round((Date.now() - S.dep) / 1000); S.id = Date.now(); delete S.sg; delete S.sd; S.snap = CFG().snap ? await snapAll(S.pts) : null; DB.routes.unshift(S) }
+    S = null; tailGeo = null; DB.active = null; save(); ending = false; $('#live').hidden = true; $('#setup').hidden = false; show(saveIt ? 'data' : 'route')
+}
+
+$('#finish').onclick = () => { if (!S.dep || S.pts.length < 2) return toast('Press "Vehicle departed" and record some movement first'); endRide(true) };
+twice($('#discard'), () => endRide(false));
+
+function ui() {
+    if (S && !$('#live').hidden) {
+        const now = Date.now(), b = $('#phase');
+        if (!S.paused) b.className = 'bar' + (S.dep ? ' rec' : '');
+        $('#depart').hidden = !!S.dep;
+        $('#pause-btn').textContent = S.paused ? 'Resume' : 'Pause';
+        $('#ptxt').textContent = S.paused ? 'PAUSED' : (S.dep ? 'Recording ' + fmt((now - S.dep) / 1000) : 'Tamseek ' + fmt((now - S.board) / 1000) + ' · not recording yet');
+        $('#sd').textContent = (S.dist / 1000).toFixed(2); $('#sv').textContent = Math.round(kmh); $('#sp').textContent = S.pts.length; $('#sn').textContent = S.pins.length;
+        updateNotif(false);
+    }
+    if (DB.ao && !$('#olive').hidden) $('#oel').textContent = fmt((Date.now() - DB.ao.start) / 1000)
+}
+setInterval(ui, 1000);
+
+/* ---------- Leaflet map (OpenStreetMap tiles) ---------- */
+let M = null, trace, pinL, me, acc, follow = true, fitted = false;
+function initMap() {
+    if (M) return;
+    M = L.map('map').setView([31.9539, 35.9106], 14);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(M);
+    trace = L.polyline([], { color: '#2f6f5e', weight: 5 }).addTo(M); pinL = L.layerGroup().addTo(M);
+    me = L.circleMarker([0, 0], { radius: 7, color: '#fff', weight: 2, fillColor: '#1d6fe0', fillOpacity: 1 });
+    acc = L.circle([0, 0], { radius: 10, stroke: false, fillColor: '#1d6fe0', fillOpacity: .15 });
+    M.on('dragstart', () => follow = false)
+}
+
+function draw() {
+    if (!S || $('#live').hidden || $('#v-route').hidden) return;
+    initMap(); M.invalidateSize();
+    trace.setLatLngs(lineGeo());
+    pinL.clearLayers(); S.pins.forEach(p => L.circleMarker([p.lat, p.lng], { radius: 8, color: '#fff', weight: 2, fillColor: PT[p.type][1], fillOpacity: 1 }).bindTooltip(p.label).addTo(pinL));
+    if (last) {
+        const ll = dotSnap && hav(last, { lat: dotSnap[0], lng: dotSnap[1] }) < 80 ? dotSnap : [last.lat, last.lng]; me.setLatLng(ll).addTo(M); acc.setLatLng(ll).setRadius(last.acc).addTo(M);
+        if (!fitted) { M.setView(ll, 17, { animate: false }); fitted = true } else if (follow) M.panTo(ll, { animate: false })
+    }
+}
+
+/* ---------- OSRM road snapping (needs internet) ---------- */
+const OSRM = 'https://router.project-osrm.org';
+let dotSnap = null, nBusy = false, nT = 0, mBusy = false, mT = 0, tailGeo = null, tailCover = 0, ending = false;
+
+async function osrmMatch(pts) {
+    if (pts.length < 2) return null;
+    const c = pts.map(p => p.lng + ',' + p.lat).join(';');
+    const r = pts.map(p => Math.min(50, Math.max(15, Math.round((p.acc || 10) * 1.5)))).join(';');
+    try {
+        const j = await (await fetch(`${OSRM}/match/v1/driving/${c}?overview=full&geometries=geojson&radiuses=${r}`)).json();
+        if (j.code !== 'Ok' || !j.matchings || !j.matchings.length) return null;
+        return j.matchings.flatMap(m => m.geometry.coordinates.map(q => [q[1], q[0]]))
+    } catch (e) { return null }
+}
+
+async function snapAll(pts) { const out = []; for (let i = 0; i < pts.length - 1; i += 89) { const ch = pts.slice(i, i + 90), g = await osrmMatch(ch); out.push(...(g || ch.map(p => [p.lat, p.lng]))) } return out }
+
+async function snapLive() {
+    const s = S; if (!CFG().snap || mBusy || !s || !s.dep || s.paused || Date.now() - mT < CFG().si * 1000) return;
+    const done = s.sd || 0, tail = s.pts.slice(done, done + 80); if (tail.length < 4) return;
+    mBusy = true; mT = Date.now(); const g = await osrmMatch(tail); mBusy = false;
+    if (S !== s || !g) return;
+    if (tail.length >= 80) { s.sg = (s.sg || []).concat(g); s.sd = done + 79; tailGeo = null } else { tailGeo = g; tailCover = done + tail.length }
+    draw()
+}
+
+async function snapDot() {
+    if (!CFG().snap || nBusy || !last || Date.now() - nT < CFG().di * 1000) return; nBusy = true; nT = Date.now(); const p = last;
+    try {
+        const j = await (await fetch(`${OSRM}/nearest/v1/driving/${p.lng},${p.lat}`)).json();
+        if (j.code === 'Ok') { const l = j.waypoints[0].location; dotSnap = hav(p, { lat: l[1], lng: l[0] }) < Math.max(40, p.acc * 2) ? [l[1], l[0]] : null }
+    } catch (e) {}
+    nBusy = false; draw()
+}
+
+function lineGeo() {
+    const raw = S.pts.map(p => [p.lat, p.lng]), d = S.sd || 0;
+    if (!S.sg && !tailGeo) return raw;
+    return (S.sg || []).concat(tailGeo || [], raw.slice(Math.max((tailGeo ? tailCover : d) - 1, 0)))
+}
+
+$('#rc').onclick = () => { follow = true; fitted = false; draw() };
+addEventListener('resize', draw);
+
+/* ---------- Observer mode ---------- */
+const LOADS = ['Empty', 'Seats free', 'Standing', 'Full'];
+$('#loads').innerHTML = LOADS.map(l => `<button data-l="${l}">${l}</button>`).join('');
+$('#ostart').onclick = () => { const loc = $('#oloc').value.trim(); if (!loc) return toast('Enter the observation spot'); DB.ao = { loc, start: Date.now(), taps: [] }; save(); obsUI() };
+$('#loads').onclick = e => { const b = e.target.closest('button'); if (!b || !DB.ao) return; DB.ao.taps.push({ line: $('#oline').value.trim() || 'Unlabelled', load: b.dataset.l, t: Date.now() }); save(); obsUI(); try { navigator.vibrate(30) } catch (e) {} };
+$('#oundo').onclick = () => { if (DB.ao) { DB.ao.taps.pop(); save(); obsUI() } };
+$('#ostop').onclick = () => { if (!DB.ao || !DB.ao.taps.length) return toast('Tap at least one vehicle first'); DB.ao.end = Date.now(); DB.obs.unshift(DB.ao); DB.ao = null; save(); obsUI(); show('data') };
+
+function head(taps) { const m = {}; taps.forEach(t => (m[t.line] = m[t.line] || []).push(t.t)); return Object.entries(m).map(([line, a]) => { a.sort((p, q) => p - q); return { line, n: a.length, gap: a.length > 1 ? (a[a.length - 1] - a[0]) / (a.length - 1) / 60000 : null } }) }
+const headTxt = taps => head(taps).map(h => `<div class="row"><span>${esc(h.line)}</span><span>${h.n} vehicles${h.gap ? ' · every ' + h.gap.toFixed(1) + ' min' : ''}</span></div>`).join('');
+function obsUI() { const a = DB.ao; $('#oset').hidden = !!a; $('#olive').hidden = !a; if (a) { $('#otitle').textContent = a.loc; $('#osum').innerHTML = headTxt(a.taps) || '<span class="mut">No vehicles logged yet.</span>' } }
+
+/* ---------- Export ---------- */
+function rdp(a, e) { if (a.length < 3) return a; const k = Math.cos(a[0].lat * rad), m = 111320, X = p => p.lng * k * m, Y = p => p.lat * m, A = a[0], B = a[a.length - 1], dx = X(B) - X(A), dy = Y(B) - Y(A), L = Math.hypot(dx, dy) || 1; let mx = 0, ix = 0; for (let i = 1; i < a.length - 1; i++) { const d = Math.abs(dy * (X(a[i]) - X(A)) - dx * (Y(a[i]) - Y(A))) / L; if (d > mx) { mx = d; ix = i } } return mx > e ? [...rdp(a.slice(0, ix + 1), e).slice(0, -1), ...rdp(a.slice(ix), e)] : [A, B] }
+const q = s => s ? `'${String(s).replace(/'/g, "''")}'` : 'NULL::text';
+
+function toSQL(r) {
+    const LS = a => a.length > 1 ? `ST_GeogFromText('LINESTRING(${a.map(p => p.lng.toFixed(6) + ' ' + p.lat.toFixed(6)).join(',')})')` : 'NULL';
+    const tr = rdp(r.pts, 3), ls = LS(tr), ls2 = r.snap && r.snap.length > 1 ? LS(rdp(r.snap.map(c => ({ lat: c[0], lng: c[1] })), 2)) : ls;
+    let s = `-- ${r.code} (${r.dir}) · trace simplified with RDP (3 m). snapped_corridor = OSRM road-snapped trace (raw trace if snapping failed).\nWITH r AS (\nINSERT INTO transit_routes (route_code,route_name,origin_terminal,destination_terminal,vehicle_type,direction,fare_jod,fare_type,total_distance_meters,avg_tamseek_seconds,avg_trip_seconds,raw_trace,snapped_corridor)\nVALUES (${q(r.code)},${q(r.name)},${q(r.from)},${q(r.to)},'${r.veh}','${r.dir}',${r.fare},'${r.ftype}',${r.dist.toFixed(1)},${r.tam},${r.trip},${ls},${ls2}) RETURNING id)\n;`;
+    if (r.pins.length) s += `INSERT INTO transit_waypoints (route_id,waypoint_type,label,kuntorol_callout,windshield_sticker,cumulative_meters,location)\nSELECT r.id,v.t,v.l,v.k,v.s,v.m,ST_GeogFromText(v.w) FROM r,(VALUES\n` + r.pins.map(p => `(${q(p.type)},${q(p.label)},${q(p.callout)},${q(p.sticker)},${p.cum}::float8,'POINT(${p.lng} ${p.lat})')`).join(',\n') + `\n) AS v(t,l,k,s,m,w);`;
+    return s
+}
+
+const toGeo = r => JSON.stringify({ type: 'FeatureCollection', features: [{ type: 'Feature', properties: { route_code: r.code, direction: r.dir, vehicle_type: r.veh, line_number: r.vnum || '001', origin_code: r.fcode || '', destination_code: r.tcode || '', distance_m: r.dist, tamseek_s: r.tam, image_attached: !!r.img }, geometry: { type: 'LineString', coordinates: r.snap && r.snap.length > 1 ? r.snap.map(c => [c[1], c[0]]) : rdp(r.pts, 3).map(p => [p.lng, p.lat]) } }, ...r.pins.map(p => ({ type: 'Feature', properties: { type: p.type, label: p.label, callout: p.callout, sticker: p.sticker, cumulative_m: p.cum }, geometry: { type: 'Point', coordinates: [p.lng, p.lat] } }))] }, null, 1);
+function out(t) { const o = $('#out'); o.hidden = false; o.value = t; o.focus(); o.select(); try { navigator.clipboard.writeText(t).then(() => toast('Copied to clipboard'), () => toast('Text selected: copy it manually')) } catch (e) { toast('Text selected: copy it manually') } }
+
+let EDIT = -1;
+const bad = r => !r.code || r.code === 'UNSET' || !r.from || r.from === '?' || !r.to || r.to === '?';
+
+function detailsHTML(r) {
+    const op = (a, v) => a.map(([k, l]) => `<option value="${k}"${k === v ? ' selected' : ''}>${l}</option>`).join('');
+    return `<div class="g2c"><div><label>Origin terminal / area</label><input data-f="from" value="${esc(r.from)}"></div><div><label>Origin code</label><input data-f="fcode" class="uc" maxlength="8" value="${esc(r.fcode || '')}"></div></div>` +
+        `<div class="g2c"><div><label>Destination terminal / area</label><input data-f="to" value="${esc(r.to)}"></div><div><label>Dest. code</label><input data-f="tcode" class="uc" maxlength="8" value="${esc(r.tcode || '')}"></div></div>` +
+        `<div class="g2c"><div><label>Vehicle</label><select data-f="veh">${op(VLIST, r.veh)}</select></div><div><label>Number</label><input data-f="vnum" class="uc" maxlength="6" value="${esc(r.vnum || '001')}"></div></div>` +
+        `<div class="g3"><div><label>Direction</label><select data-f="dir">${op([['outbound', 'Outbound'], ['inbound', 'Inbound']], r.dir)}</select></div><div><label>Fare (JOD)</label><input data-f="fare" type="number" step="0.05" min="0" value="${r.fare}"></div><div><label>Fare type</label><select data-f="ftype">${op([['flat', 'Flat'], ['staged', 'Staged']], r.ftype)}</select></div></div>` +
+        `<label>Route name (auto-filled)</label><input data-f="name" value="${esc(r.name)}">` +
+        `<label>Route code (auto-filled)</label><input data-f="code" class="uc" value="${esc(r.code)}">` +
+        `<label>Trip photo / Receipt</label>` +
+        (r.img ? `<div style="margin-top:4px"><img src="${r.img}" class="img-thumb"><button type="button" data-act="rm-img" style="min-height:36px;margin-top:4px;width:100%">Remove photo</button></div>` : `<input type="file" data-act="edit-img" accept="image/*">`);
+}
+
+function wireAutoBox(box, onChange) {
+    box.addEventListener('input', e => {
+        const f = e.target.dataset.f;
+        if (['from', 'fcode', 'to', 'tcode', 'veh', 'vnum'].includes(f)) {
+            const gv = k => { const el = box.querySelector(`[data-f="${k}"]`); return el ? el.value : '' };
+            const ce = box.querySelector('[data-f="code"]'), ne = box.querySelector('[data-f="name"]');
+            if (ce) ce.value = buildRouteCode(gv('fcode'), gv('tcode'), gv('veh'), gv('vnum'));
+            if (ne) ne.value = buildRouteName(gv('from'), gv('to'));
+        }
+        if (onChange) onChange();
+    });
+    box.addEventListener('change', e => {
+        if (e.target.dataset.act === 'edit-img') {
+            handleImgFile(e.target.files[0], d => {
+                if (S) S.img = d; else if (EDIT >= 0) DB.routes[EDIT].img = d;
+                renderData();
+            });
+        }
+    });
+    box.addEventListener('click', e => {
+        if (e.target.dataset.act === 'rm-img') {
+            if (S) S.img = ''; else if (EDIT >= 0) DB.routes[EDIT].img = '';
+            renderData();
+        }
+    });
+}
+
+function pinsHTML(r) { return r.pins.map((p, i) => `<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--line)"><small>${esc((PT[p.type] || [p.type])[0])} · ${Math.round(p.cum || 0)} m</small><input data-pi="${i}" data-pf="label" value="${esc(p.label)}"><div class="g2" style="margin-top:4px"><input data-pi="${i}" data-pf="callout" placeholder="Kuntorol callout" value="${esc(p.callout)}"><input data-pi="${i}" data-pf="sticker" placeholder="Sticker colour" value="${esc(p.sticker)}"></div></div>`).join('') || '<small class="mut">No pins yet.</small>' }
+
+function readDetails(box, r) {
+    box.querySelectorAll('[data-f]').forEach(e => {
+        const k = e.dataset.f;
+        if (k === 'fare') r[k] = +e.value || 0;
+        else if (k === 'fcode' || k === 'tcode') r[k] = e.value.trim().toUpperCase();
+        else if (k === 'vnum') r[k] = fmtVnum(e.value);
+        else r[k] = e.value.trim();
+    });
+}
+
+function readPins(box, r) { box.querySelectorAll('[data-pi]').forEach(e => { const p = r.pins[+e.dataset.pi]; if (p) p[e.dataset.pf] = e.value.trim() }) }
+
+const editCard = (r, i) => `<div class="card" id="ecard" style="margin-bottom:10px;border-color:var(--acc)"><b>Edit ride</b>${detailsHTML(r)}<b style="display:block;margin-top:10px">Pins</b>${pinsHTML(r)}<div class="g2" style="margin-top:10px"><button data-a="ecancel" data-i="${i}">Cancel</button><button data-a="esave" data-i="${i}" class="p">Save changes</button></div></div>`;
+
+$('#ed').addEventListener('toggle', () => { if ($('#ed').open && S) $('#edbox').innerHTML = detailsHTML(S) + '<b style="display:block;margin-top:10px">Pins</b>' + pinsHTML(S) });
+wireAutoBox($('#edbox'), () => { if (S) { readDetails($('#edbox'), S); readPins($('#edbox'), S); persist(); updateNotif(true) } });
+
+function renderData() {
+    seqUI();
+    $('#routes').innerHTML = DB.routes.map((r, i) => EDIT === i ? editCard(r, i) : `<div class="card" style="margin-bottom:10px"><b>${esc(r.code)}</b> <small>${r.dir} · ${r.veh}</small>${bad(r) ? ' <small style="color:var(--bad)">details missing</small>' : ''}<br><small>${esc(r.name)}<br>${(r.dist / 1000).toFixed(2)} km · ${r.pts.length} points · ${r.pins.length} pins · Tamseek ${fmt(r.tam)} · trip ${fmt(r.trip)}${r.sim ? ' · demo' : ''}${r.img ? ' · 📷 photo' : ''}</small><div class="g2" style="margin-top:8px"><button data-a="edit" data-i="${i}" class="p">Edit details</button><button data-a="sql" data-i="${i}">SQL</button><button data-a="geo" data-i="${i}">GeoJSON</button><button data-a="del" data-i="${i}" class="d">Delete</button></div></div>`).join('') || '<p class="mut">No saved rides yet. Start one on the Ride tab.</p>';
+    if (EDIT >= 0 && $('#ecard')) wireAutoBox($('#ecard'));
+    $('#obsd').innerHTML = DB.obs.map((o, i) => `<div class="card" style="margin-bottom:10px"><b>${esc(o.loc)}</b> <small>${new Date(o.start).toLocaleString()} · ${fmt((o.end - o.start) / 1000)}</small>${headTxt(o.taps)}<div class="g2" style="margin-top:8px"><button data-a="ojson" data-i="${i}">JSON</button><button data-a="odel" data-i="${i}" class="d">Delete</button></div></div>`).join('')
+}
+
+document.addEventListener('click', e => {
+    const b = e.target.closest('button[data-a]'); if (!b) return; const i = +b.dataset.i, a = b.dataset.a;
+    if (a === 'edit') { EDIT = i; renderData(); return }
+    if (a === 'ecancel') { EDIT = -1; renderData(); return }
+    if (a === 'esave') { const r = DB.routes[i], c = $('#ecard'); readDetails(c, r); readPins(c, r); EDIT = -1; save(); renderData(); toast('Ride updated'); return }
+    if (a === 'sql') out(toSQL(DB.routes[i])); else if (a === 'geo') out(toGeo(DB.routes[i])); else if (a === 'ojson') out(JSON.stringify(DB.obs[i], null, 1));
+    else {
+        if (!b.dataset.arm) { b.dataset.arm = 1; b.textContent = 'Tap again'; setTimeout(() => { delete b.dataset.arm; b.textContent = 'Delete' }, 3000); return }
+        (a === 'del' ? DB.routes : DB.obs).splice(i, 1); save(); renderData()
+    }
+});
+
+$('#backup').onclick = () => out(JSON.stringify({ routes: DB.routes, obs: DB.obs }));
+const pad = n => String(n).padStart(4, '0'), seqN = () => { const n = parseInt(DB.seq, 10); return n >= 0 && n <= 9999 ? n : 0 };
+const fcode = () => { const c = (DB.routes[0] && DB.routes[0].code) || 'NOROUTE'; return String(c).toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-|-/g, '') || 'NOROUTE' };
+
+function seqUI() { $('#bkdl').textContent = 'Download ' + fcode() + '-' + pad(seqN()) + '.json' }
+$('#bkdl').onclick = () => {
+    const n = seqN(), id = pad(n), day = new Date(Date.now() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({ id, date: day, routes: DB.routes, obs: DB.obs })], { type: 'application/json' })); a.download = `${fcode()}-${id}-${day}.json`; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove() }, 500);
+    DB.seq = (n + 1) % 10000; save(); seqUI(); toast('Saved as ' + fcode() + '-' + id)
+};
+
+let rs = 0; $('#seqreset').onclick = function () { const b = this; if (rs) { rs = 0; DB.seq = 0; save(); seqUI(); b.textContent = 'Reset numbering to 0000'; toast('Numbering reset to 0000'); return } rs = 1; b.textContent = 'Tap again to reset to 0000'; setTimeout(() => { rs = 0; b.textContent = 'Reset numbering to 0000' }, 3000) };
+seqUI();
+
 /* ---------- Boot ---------- */
 const CFGD = { dt: 3, dd: 10, ak: 1, hb: 30, acc: 40, snap: 1, si: 8, di: 3, rkm: 8, ntf: 1 };
 const CF = [['rkm', 'Expected route distance for notification progress bar (km)', 0.5], ['dt', 'Min seconds between points', 0.5], ['dd', 'Min metres moved between points', 1], ['ak', 'Also require movement > GPS error x', 0.1], ['hb', 'Heartbeat point when stopped (s, 0 = never)', 1], ['acc', 'Ignore fixes worse than (m)', 5], ['si', 'Road-snap the trace every (s)', 1], ['di', 'Road-snap the dot every (s)', 1]];
@@ -38,21 +740,17 @@ function renderCfg() {
 $('#cfg').addEventListener('change', () => { DB.cfg = CFG(); save() });
 $('#cfgreset').onclick = () => { DB.cfg = null; save(); renderCfg(); toast('Settings reset') };
 
-$('#cfgexport').onclick = () => {
-    const curCfg = CFG();
-    const blob = new Blob([JSON.stringify(curCfg, null, 2)], { type: 'application/json' });
+$('#cfgexp').onclick = () => {
+    const data = JSON.stringify(DB.cfg || CFGD, null, 2);
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
+    a.href = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
     a.download = 'atl-settings.json';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove() }, 500);
+    document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove() }, 500);
     toast('Settings exported');
 };
 
-$('#cfgimportbtn').onclick = () => $('#cfgimportfile').click();
-
-$('#cfgimportfile').onchange = e => {
+$('#cfgimp_btn').onclick = () => $('#cfgimp_file').click();
+$('#cfgimp_file').onchange = e => {
     const file = e.target.files[0];
     if (!file) return;
     const r = new FileReader();
@@ -60,15 +758,11 @@ $('#cfgimportfile').onchange = e => {
         try {
             const parsed = JSON.parse(ev.target.result);
             if (typeof parsed === 'object' && parsed !== null) {
-                DB.cfg = Object.assign({}, CFGD, parsed);
-                save();
-                renderCfg();
-                toast('Settings imported successfully');
+                DB.cfg = Object.assign(CFG(), parsed);
+                save(); renderCfg(); toast('Settings imported');
             } else throw new Error('Invalid JSON');
-        } catch (err) {
-            toast('Failed to import settings: Invalid JSON');
-        }
-        $('#cfgimportfile').value = '';
+        } catch(err) { toast('Error importing settings'); }
+        $('#cfgimp_file').value = '';
     };
     r.readAsText(file);
 };
